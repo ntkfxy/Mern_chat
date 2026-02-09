@@ -96,7 +96,20 @@ const login = async (req, res) => {
       return res.status(401).json({ message: "Invalid credentials" });
     }
 
-    // login สำเร็จ → ส่งข้อมูล user กลับ
+    // สร้าง JWT token
+    const token = jwt.sign({ id: user._id, fullname: user.fullname }, secret, {
+      expiresIn: "1d",
+    });
+
+    // เก็บ token ลง cookie
+    res.cookie("token", token, {
+      httpOnly: true, // JS ฝั่ง client อ่านไม่ได้
+      secure: process.env.NODE_ENV === "production", // https เท่านั้นใน production
+      sameSite: "strict",
+      maxAge: 24 * 60 * 60 * 1000, // 1 วัน
+    });
+
+    // ส่งข้อมูล user กลับ (ไม่ส่ง token)
     res.json({
       _id: user._id,
       email: user.email,
