@@ -12,6 +12,7 @@ require("dotenv").config();
 
 // ดึง secret key สำหรับใช้ sign JWT
 const secret = process.env.JWT_SECRET;
+const cloudinary = require("../configs/cloudinary");
 
 /**
  * =========================
@@ -19,10 +20,10 @@ const secret = process.env.JWT_SECRET;
  * =========================
  */
 const register = async (req, res) => {
-  const { fullname, email, password } = req.body;
+  const { fullName, email, password } = req.body;
 
   // ตรวจสอบ input
-  if (!fullname || !email || !password) {
+  if (!fullName || !email || !password) {
     return res.status(400).json({
       message: "Please provide fullname, email and password",
     });
@@ -43,13 +44,13 @@ const register = async (req, res) => {
 
     // สร้าง user ใหม่
     const user = await UserModel.create({
-      fullname,
+      fullName,
       email,
       password: hashedPassword,
     });
 
     // สร้าง JWT token
-    const token = jwt.sign({ id: user._id, fullname: user.fullname }, secret, {
+    const token = jwt.sign({ id: user._id, fullName: user.fullName }, secret, {
       expiresIn: "1d",
     });
 
@@ -57,7 +58,7 @@ const register = async (req, res) => {
     res.status(201).json({
       message: "User Register in successfully",
       id: user._id,
-      fullname: user.fullname,
+      fullName: user.fullname,
       accessToken: token,
     });
   } catch (error) {
@@ -97,7 +98,7 @@ const login = async (req, res) => {
     }
 
     // สร้าง JWT token
-    const token = jwt.sign({ id: user._id, fullname: user.fullname }, secret, {
+    const token = jwt.sign({ id: user._id, fullName: user.fullName }, secret, {
       expiresIn: "1d",
     });
 
@@ -113,7 +114,7 @@ const login = async (req, res) => {
     res.json({
       _id: user._id,
       email: user.email,
-      fullname: user.fullname,
+      fullName: user.fullName,
       profilePic: user.profilePic,
     });
   } catch (error) {
@@ -123,9 +124,10 @@ const login = async (req, res) => {
   }
 };
 
+// ฟังก์ชันสำหรับ logout โดยลบ cookie token
 const logOut = async (req, res) => {
   try {
-    res.cookie("jwt", "", { maxAge: 0 });
+    res.cookie("token", "", { maxAge: 0 }); // ลบ cookie โดยตั้งค่าเป็นค่าว่างและหมดอายุทันที
     res.status(200).json({ message: "Logged out successfully" });
   } catch (error) {
     res.status(500).json({
@@ -134,5 +136,96 @@ const logOut = async (req, res) => {
   }
 };
 
+const updateProfile = async (req, res) => {
+  try {
+    const fullName = req.body?.fullName;
+    const profilePic = req.body?.profilePic;
+    const userId = req.user._id;
+
+    if (fullName && profilePic) {
+      const uploadResponse = await cloudinary.uploader.upload(profilePic);
+
+      if (!uploadResponse) {
+        return res.status(500).json({
+          message: "Error while uploading profile picture",
+        });
+      }
+
+      const updatedUser = await UserModel.findByIdAndUpdate(
+        userId,
+        {
+          fullName: fullName,
+          profilePic: uploadResponse.secure_url,
+        },
+        { new: true },
+      );
+
+      if (!updatedUser) {
+        return res.status(500).json({
+          message: "Error while updating user profile",
+        });
+      }
+
+      return res.json({
+        message: "User profile updated successfully",
+      });
+    } else if (fullName) {
+      const updatedUser = await UserModel.findByIdAndUpdate(
+        userId,
+        { fullName: fullName },
+        { new: true },
+      );
+
+      if (!updatedUser) {
+        return res.status(500).json({
+          message: "Error while updating user profile",
+        });
+      }
+
+      return res.json({
+        message: "User profile updated successfully",
+      });
+    } else if (profilePic) {
+      const uploadResponse = await cloudinary.uploader.upload(profilePic);
+
+      if (!uploadResponse) {
+        return res.status(500).json({
+          message: "Error while uploading profile picture",
+        });
+      }
+
+      const updatedUser = await UserModel.findByIdAndUpdate(
+        userId,
+        { profilePic: uploadResponse.secure_url },
+        { new: true },
+      );
+
+      if (!updatedUser) {
+        return res.status(500).json({
+          message: "Error while updating Picture profile",
+        });
+      }
+
+      return res.json({
+        message: "Picture profile updated successfully",
+      });
+    }
+  } catch (error) {
+    return res.status(500).json({
+      message: "Internal Server Error while updating ProfilePicture",
+    });
+  }
+};
+
+const checkAuth = async (req, res) => {
+  try {
+    res.status(200).json(req.user);
+  } catch (error) {
+    res
+      .status(500)
+      .json({ message: "Internal Server Error while checking auth" });
+  }
+};
+
 // export ฟังก์ชันไปใช้ใน router
-module.exports = { register, login, logOut };
+module.exports = { register, login, logOut, updateProfile, checkAuth };
