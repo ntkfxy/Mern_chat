@@ -147,7 +147,7 @@ const ProfilePage = () => {
 
           <div className="flex justify-between py-2 border-b">
             <span className="text-slate-500">Member Since</span>
-            <span>{authUser?.createdAt?.slice(0, 10)}</span>
+            <span>{authUser?.timestamps?.slice(0, 10)}</span>
           </div>
 
           <div className="flex justify-between py-2">

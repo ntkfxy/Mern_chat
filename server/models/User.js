@@ -8,8 +8,7 @@ const UserSchema = new Schema(
     password: { type: String, required: true, min: 8 },
     profilePic: {
       type: String,
-      default:
-        "https://pixabay.com/images/download/wanderercreative-blank-profile-picture-973460_1920.png",
+      default: "",
     },
   },
   { timestamps: true },
