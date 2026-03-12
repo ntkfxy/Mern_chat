@@ -1,50 +1,48 @@
-//commaonts to explain what this file is about
+const express = require("express");
 const dotenv = require("dotenv");
-dotenv.config();
-const mongoose = require("mongoose");
 const cors = require("cors");
 const cookieParser = require("cookie-parser");
-const express = require("express");
-const DB_URL = process.env.DB_URL;
-const CLIENT_URL = process.env.CLIENT_URL;
-
-//import router
-const UserRouter = require("./routers/user.router");
-const MessageRouter = require("./routers/message.router");
-// const PostRouter = require("./routers/post.router");
-
-const PORT = process.env.PORT;
+const mongoose = require("mongoose");
 const { server, app } = require("./lib/socket");
 
-//middleware หน้าที่เป็นตัวกลาง
-//แปลงข้อมูลที่รับมาให้อยู่ในรูปเเบบ json
-app.use(express.json());
+// นำเข้า Router 
+const UserRouter = require("./routers/user.router");
+const MessageRouter = require("./routers/message.router");
 
-//อนุญาติให้ทุกคนเข้าถึง server ได้
-app.use(
-  cors({
-    //อนุญาติให้ส่ง cookie ข้าม domain ได้
-    credentials: true,
-    //อนุญาติให้ client ที่มาจาก BASE_URL เชื่อมต่อกับ server ได้
-    origin: CLIENT_URL,
-    //อนุญาติให้ใช้ method อะไรบ้าง นอกเหนือจากนี้จะไม่อนุญาติ
-    methods: ["GET", "POST", "PUT", "DELETE"],
-    //อนุญาติให้ใช้ header อะไรบ้าง
-    allowedHeaders: ["Content-Type", "Authorization", "x-access-token"],
-  }),
-);
-//ต้องใช้ตัวนี้ในการจัดการ cookie
+dotenv.config();
+
+// ประกาศตัวแปรจาก .env ให้ครบ
+const DB_URL = process.env.DB_URL;
+const CLIENT_URL = process.env.CLIENT_URL;
+const PORT = process.env.PORT || 5000;
+
+// 1. Middleware: จัดการเรื่องขนาดไฟล์และ JSON
+app.use(express.json({ limit: "50mb" }));
+app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 app.use(cookieParser());
 
-//อนุญาติบาง method ใช้แบบนี้ได้
-// server ส่งหา  client หากเชื่อมต่อกันถูกต้อง
+// 2. Middleware: CORS
+app.use(
+  cors({
+    origin: CLIENT_URL,
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE"],
+    allowedHeaders: ["Content-Type", "Authorization", "x-access-token"],
+  })
+);
+
+// 3. เส้นทางทดสอบ (Root Route)
 app.get("/", (req, res) => {
-  res.send("<h1>Welcome to  MERN CHAT SERVER</h1>");
+  res.send("<h1>Welcome to MERN CHAT SERVER</h1>");
 });
 
-//เชื่อมต่อฐานข้อมูล
+// 4. ประกาศใช้งาน Router (ต้องอยู่หลัง Middleware ด้านบน)
+app.use("/api/v1/user", UserRouter);
+app.use("/api/v1/message", MessageRouter);
+
+// 5. การเชื่อมต่อฐานข้อมูล
 if (!DB_URL) {
-  console.error("DB_URL is missing. please set it in your .env file.");
+  console.error("DB_URL is missing. Please set it in your .env file.");
 } else {
   mongoose
     .connect(DB_URL)
@@ -52,15 +50,10 @@ if (!DB_URL) {
       console.log("Connected to MongoDB successfully");
     })
     .catch((error) => {
-      console.error("MongoDB connection error", error.message);
+      console.error("MongoDB connection error:", error.message);
     });
 }
 
-//ต้องการให้รับ app ทั้ง 2 ทาง
 server.listen(PORT, () => {
   console.log(`Server is running on http://localhost:${PORT}`);
 });
-
-//Router
-app.use("/api/v1/user", UserRouter);
-app.use("/api/v1/message", MessageRouter);

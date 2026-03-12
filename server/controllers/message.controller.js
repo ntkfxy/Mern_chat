@@ -1,14 +1,17 @@
-const Message = require("../models/Messege");
+const Message = require("../models/Messege"); // สะกดตามไฟล์เดิมของคุณนะครับ
 const User = require("../models/User");
 const cloudinary = require("../configs/cloudinary");
 require("dotenv").config();
+
+// นำเข้า io และฟังก์ชันหา Socket ID ที่เราสร้างไว้ในไฟล์ socket.js
+const { io, getRecipientSocketId } = require("../lib/socket");
 
 const getUserForSidebar = async (req, res) => {
   try {
     const loggedUserId = req.user._id;
     const filteredUsers = await User.find({
       _id: { $ne: loggedUserId },
-    }).selected("-password");
+    }).select("-password");
     res.status(200).json(filteredUsers);
   } catch (error) {
     res
@@ -26,21 +29,39 @@ const sendMessage = async (req, res) => {
 
     const senderId = req.user._id;
     const { text, file } = req.body;
+    
     // if(text === "" && file ==="" ){
     //     return res.status(400).json({message: "Message is empty"});
     // }
+    
     let fileUrl = "";
     if (file) {
       const uploadResponse = await cloudinary.uploader.upload(file);
       fileUrl = uploadResponse.secure_url;
     }
+    
     const newMessage = new Message({
       senderId,
       recipientId,
       text,
       file: fileUrl,
     });
+    
+    // 1. บันทึกข้อความลงฐานข้อมูล
     await newMessage.save();
+
+    // ==========================================
+    // 2. ส่วนเสริมสำหรับ Socket.io (Real-time)
+    // ==========================================
+    // เช็คว่าผู้รับ (เพื่อนที่เราส่งหา) ออนไลน์อยู่หรือไม่
+    const receiverSocketId = getRecipientSocketId(recipientId);
+
+    if (receiverSocketId) {
+      // ถ้าออนไลน์ ให้ส่ง event "newMessage" ตรงไปที่หน้าจอของเขาเลย
+      io.to(receiverSocketId).emit("newMessage", newMessage);
+    }
+    // ==========================================
+
     res.json(newMessage);
   } catch (error) {
     res
@@ -48,6 +69,7 @@ const sendMessage = async (req, res) => {
       .json({ message: "Internal Server Error While sending message" });
   }
 };
+
 const getMessage = async (req, res) => {
   try {
     const myId = req.user._id;
